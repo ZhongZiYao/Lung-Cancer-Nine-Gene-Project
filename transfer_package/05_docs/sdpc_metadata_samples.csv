@@ -1,0 +1,4 @@
+file,file_size_bytes,version,hierarchy,src_W,src_H,slice_W,slice_H,thumb_W,thumb_H,scale,ruler_um_per_px,rate,bpp,quality,slice_format,scanner_model,scanner_serial,barCode,scanTime_unix,step_um,pathologyID,patient_name,patient_sex,patient_age,hospital,attendingDoctor
+895983003.sdpc,2156933,1.0.3.1010,4,6912,6912,288,288,300,300,0.5,0.4131944444444444,40,24,35,4,FV-025G-X4C,SQS600P-222300AG,895983003,25,0.0,,,0,0,,
+889949001.sdpc,155318074,1.0.3.1010,6,38016,36864,288,288,301,291,0.5,0.4131944444444444,40,24,35,4,FV-025G-X4C,SQS600P-222300AG,889949001,51,0.0,,,0,0,,
+751999003.sdpc,977469431,1.0.3.1010,8,126336,107520,672,672,300,255,0.5,0.20684523809523808,40,24,35,4,FV-025G-X4C,SQS600P-222300AG,02572459,199,0.0,,,0,0,,

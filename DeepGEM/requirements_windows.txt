@@ -1,0 +1,45 @@
+# DeepGEM - Windows 10/11 适配版 requirements
+# 适配 Python 3.10-3.13 + CUDA 12.x/13.x + RTX 5070 (sm_120)
+# 原始 requirements 是 Python 3.7 + torch 1.7.1 (2021)，已升级到 2024-2025 版本
+
+# ===== 深度学习核心 =====
+# PyTorch 2.6+ 支持 RTX 5070 (Blackwell, sm_120)
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch>=2.5.0
+torchvision>=0.20.0
+
+# ===== 数据/科学栈 =====
+numpy>=1.24,<3.0
+pandas>=2.0,<3.0
+scikit-learn>=1.3
+scikit-image>=0.21
+Pillow>=10.0
+h5py>=3.8
+tqdm>=4.66
+
+# ===== 病理图像 =====
+# 旧版 openslide-python 在 Windows 上很难装，换用更现代的替代
+# opencv (DeepGEM 用了 contrib 的 EfficientNet 特征)
+opencv-python>=4.8
+opencv-contrib-python>=4.8
+
+# DeepGEM 用了 ctranspath，预训练权重需要用 timm 加载 Swin Transformer
+# 替换原 timm-0.5.4.tar (Google Drive 下载链常挂)
+timm>=0.9.0
+
+# ===== DeepGEM 代码自身用到的 =====
+albumentations>=1.3  # 图像增强
+efficientnet-pytorch>=0.7.1  # EfficientNet-B0 backbone 备选
+yacs>=0.1.8  # 配置管理
+
+# ===== 可视化 / 日志 =====
+rich>=13.0
+
+# ===== 生存分析 (生存预测 head 可选) =====
+lifelines>=0.27
+torchtuples>=0.2.0  # DeepPLE 模块需要
+numba>=0.58  # lifelines 依赖
+
+# ===== 训练时可选 =====
+matplotlib>=3.7
+seaborn>=0.13

@@ -1,0 +1,117 @@
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ----- venv / build -----
+.env
+venv/
+env/
+.venv/
+.envrc
+build/
+dist/
+
+# ----- IDE -----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ----- Claude Code -----
+.claude/
+.tmp/
+
+# ----- OS junk -----
+.DS_Store
+Thumbs.db
+*~
+*.tmp
+
+# =======================================================
+# 数据 / 模型权重 / 输出 (大文件/敏感数据/可重新生成)
+# =======================================================
+# 注意: 全部都是 SHIELDED
+# 这些是项目缓存/patches/features/weights/checkpoints
+# 不要 commit 这些,不是单一来源,可由 pipeline 重新生成
+
+# 原始数据 (TCGA-LUAD 86+ GB)
+transfer_package/data/
+transfer_package/data/_sdpc_evidence/
+transfer_package/data/_xlsx_dump/
+transfer_package/data/_xlsx_dump_v2/
+transfer_package/data/MC3/
+transfer_package/data/TCGA-LUAD-WSI/
+
+# pipeline 缓存 (patches JPG / features npy / per-patch pkl)
+pipeline/deepgem_test/patches/
+pipeline/deepgem_test/features/
+pipeline/deepgem_test/deepgem_feat/
+pipeline/deepgem_test/data/
+pipeline/deepgem_test/logs/
+pipeline/patches/
+
+# 远程 README sample data (DeepGEM 项目里)
+DeepGEM/sample_data/
+DeepGEM/sample_data/WSI/
+DeepGEM/sample_data/patch/
+DeepGEM/sample_data/feat/
+DeepGEM/sample_data/combined_feat/
+DeepGEM/sample_data/dict_name2imgs.pkl
+DeepGEM/sample_data/dict_name2imgs_path_rmbg.pkl
+
+# TITAN / Prediction-of-Mutated-Genes 仓库内的样本数据 (大文件)
+TITAN/test-*.parquet
+TITAN/datasets/*.csv.gz
+Prediction-of-Mutated-Genes-in-Lung-Adenocarcinoma-Based-on-Weak-Supervision/sample/
+Prediction-of-Mutated-Genes-in-Lung-Adenocarcinoma-Based-on-Weak-Supervision/sample_svs/
+
+# 第三方大权重 (UNI/DeepGEM/TITAN/CONCH 模型权重)
+# UNI 权重 1.2 GB
+UNI/assets/ckpts/uni/pytorch_model.bin
+# DeepGEM 训好的 9 个 gene model (×2 biopsy type,每个 ~5-300 MB)
+DeepGEM/checkpoints/DeepGEM_TCGA/*.pickle
+DeepGEM/checkpoints/DeepGEM/*.pickle
+DeepGEM/checkpoints/pretrain/ctranspath.pth
+DeepGEM/checkpoints/pretrain/TransPath
+DeepGEM/timm-0.5.4.tar
+# TITAN 衍生数据
+TITAN/datasets/TCGA-Slide-Reports.csv/tcga_reports_cleaned.csv
+TITAN/output.csv
+TITAN/datasets/TCGA-Slide-Reports.csv.gz
+TITAN/test-*.parquet
+# CONCH 权重
+CONCH/checkpoints/CONCH/pytorch_model.bin
+CONCH/prompts/
+# UNI 公开 demo data
+UNI/assets/data/
+
+# 论文 (本地参考,推不推)
+*.pdf
+
+# 文档 (容易过期 / 一次性,不要推)
+*.pptx
+*.docx
+*.xlsx
+*.pdf
+
+# 中日合作项目 (冰冻切片, 数据敏感)
+中日冰冻切片/
+
+# 论文/报告生成脚本 (非项目主线)
+gen_research_report.py
+paper2_text.txt
+
+# 老的 gen scripts (你在 Paper-* 里有)
+Paper-Presentation/
+Paper-ZhongGAMIL/
+
+# ----- Logs -----
+*.log
+logs/

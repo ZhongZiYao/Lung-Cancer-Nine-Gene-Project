@@ -1,0 +1,125 @@
+{
+  "file": "895983003.sdpc",
+  "file_path": "D:\\pan-caner\\data\\ÖÐÈÕ±ù¶³ÇÐÆ¬\\895983003.sdpc",
+  "file_size_bytes": 2156933,
+  "sdpc": {
+    "magic_flag_hex": "0x5153",
+    "version": "1.0.3.1010",
+    "headSize": 156,
+    "fileSize_declared": 2156933,
+    "fileSize_match": true,
+    "hierarchy_levels": 4,
+    "src_WxH": [
+      6912,
+      6912
+    ],
+    "slice_WxH": [
+      288,
+      288
+    ],
+    "thumbnail_WxH": [
+      300,
+      300
+    ],
+    "bpp": 24,
+    "quality": 35,
+    "color_space_hex": "08000000",
+    "scale": 0.5,
+    "ruler_um_per_pixel": 0.4131944444444444,
+    "rate": 40,
+    "extra_offset": 6964,
+    "tile_offset": 0,
+    "slice_format": 4
+  },
+  "patient": {
+    "flag": 0,
+    "inforSize": 2554941440,
+    "pathologyID": "\u001a",
+    "name": "",
+    "sex": "0",
+    "age": 0,
+    "departments": "",
+    "hospital": "",
+    "submittedSamples": "",
+    "clinicalDiagnosis": "",
+    "pathologicalDiagnosis": "",
+    "reportDate": "",
+    "attendingDoctor": "",
+    "remark": ""
+  },
+  "scanner": {
+    "model": "FV-025G-X4C",
+    "ccmGamma": 1.0,
+    "ccmRgbRate": [
+      0.9203000068664551,
+      0.7605000138282776,
+      0.8141000270843506
+    ],
+    "ccmHsvRate": [
+      1.0,
+      1.0,
+      0.9980000257492065
+    ],
+    "ccm_matrix": [
+      1.5725257396697998,
+      -0.45676788687705994,
+      0.00028733533690683544,
+      -0.02708456479012966,
+      1.1432733535766602,
+      0.23042134940624237,
+      0.10128296166658401,
+      -0.7841987013816833,
+      1.9407519102096558
+    ],
+    "timeConsuming_str": "2024/4/23 10:22:03",
+    "scanTime_unix": 25,
+    "stepTime": [
+      2,
+      21,
+      2,
+      0,
+      64,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "serial": "SQS600P-222300AG",
+    "fusionLayer": 0,
+    "step_um": 0.0,
+    "focusPoint": 4,
+    "validFocusPoint": 3,
+    "barCode": "895983003",
+    "cameraGamma": 1.100000023841858,
+    "cameraExposure_ms": 10.0,
+    "cameraGain": 2.0
+  },
+  "pyramid": {
+    "level_downsamples": [
+      1.0,
+      2.0,
+      4.0,
+      8.0
+    ],
+    "level_dimensions_est": [
+      [
+        6912,
+        6912
+      ],
+      [
+        13824,
+        13824
+      ],
+      [
+        27648,
+        27648
+      ],
+      [
+        55296,
+        55296
+      ]
+    ]
+  }
+}
+---
