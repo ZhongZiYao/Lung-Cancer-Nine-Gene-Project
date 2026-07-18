@@ -10,7 +10,11 @@ GitHub: https://github.com/ZhongZiYao/Lung-Cancer-Nine-Gene-Project
 
 用 H&E 全片病理图（WSI）作为唯一输入，预测 TCGA-LUAD 患者 9 个 driver gene 的突变状态：
 
-`EGFR  KRAS  ALK  ROS1  TP53  BRAF  PIK3CA  ERBB2  NRAS  RET`（最终清单见 `transfer_package/02_data_public/9gene_panel_LUAD.csv`）
+`EGFR  KRAS  ALK  ROS1  TP53  BRAF  PIK3CA  ERBB2  NRAS  RET`（最终清单见 `project_resources/data_public/9gene_panel_LUAD.csv`）
+
+**训练数据流**：
+- **开发期**：TCGA-LUAD DICOM（已下 50 cases, ~6 GB, 在 `data/TCGA-LUAD-WSI/`）
+- **生产期**：中日友好医院冰冻切片 `.sdpc`（合作方提供，等接入）
 
 ---
 
@@ -68,7 +72,7 @@ Lung-Cancer-Nine-Gene-Project/
 ├── requirements.txt                   ← pip install -r requirements.txt
 ├── .gitignore
 │
-├── pipeline/                          ← **本项目核心代码**
+├── pipeline/                          ← **开发期代码（DICOM 路线）**
 │   ├── extract_patches_direct.py      ← 切 patch（DICOM → 256 JPG）
 │   ├── step1_extract_features_uni.py  ← UNI 抽 feature（备选路线）
 │   ├── step2_to_deepgem_pkl.py        ← train_plan → deepgem .pkl
@@ -83,21 +87,26 @@ Lung-Cancer-Nine-Gene-Project/
 │       ├── step5_slice_ensemble.py    ← multi-slice ensemble
 │       └── README.md
 │
-├── transfer_package/                  ← **项目"上下游"原始资料**
-│   ├── 01_code/
-│   │   ├── scripts/                    ← PowerShell 跑批脚本
-│   │   ├── tools/                      ← 9-gene label 抽取, profile 等
-│   │   └── memory/                     ← 项目状态备忘 (不走 repo)
-│   ├── 02_data_public/                 ← **推送：CSV / TSV（labels 和 case id）**
-│   │   ├── 9gene_panel_LUAD.csv        ← 9 gene labels (per-case)
+├── project_resources/                  ← **项目"上下游"原始资料**
+│   ├── README.md                      ← 资料袋说明 + 复现指南
+│   │
+│   ├── data_public/                   ← ⭐ 推送：CSV / TSV（训练契约）
+│   │   ├── 9gene_panel_LUAD.csv        ← 9 gene labels (421 cases × 11 genes)
 │   │   ├── manifest_50.tsv
 │   │   ├── picked_50_case_ids.json
-│   │   └── tcga_luad_cases.json
-│   ├── 04_papers/                      ← 参考论文代码（少量）
-│   ├── 05_docs/                        ← 项目说明 docx/md
-│   ├── 06_assets/                      ← 项目图片资源
-│   ├── scripts/
-│   └── data/                           ← **不推**：86 GB 原始 DICOM
+│   │   ├── tcga_luad_cases.json
+│   │   └── README.md                  ← DICOM 数据契约
+│   │
+│   ├── sdpc_pipeline/                 ← 🔥 SDPC 主线（生产数据）
+│   │   ├── tools/                     ← 10 个 .py：抽 patch / 抽 label / SDPC 解析
+│   │   ├── notes/
+│   │   │   ├── PROJECT_HANDOVER.md    ← 当前项目状态（给新会话 Claude）
+│   │   │   └── sdpc_调研报告.md       ← .sdpc 格式调研（13 KB）
+│   │   └── sample_data/               ← .gitignore（不进 repo）
+│   │
+│   └── references/                    ← 推送：论文 reference
+│       ├── zhong_GAMIL/               ← 钟 paper GAMIL README
+│       └── zhong_paper_cn/            ← 钟论文中文版 HTML + 5 figures
 │
 ├── models/                            ← 第三方 git submodule 引用
 │   ├── UNI/                           ← mahmoodlab/UNI (submodule)
@@ -108,10 +117,14 @@ Lung-Cancer-Nine-Gene-Project/
 │   ├── Prediction-of-Mutated-Genes/    ← THUML/...  (submodule)
 │   └── README.md                       ← 各自 README 入口
 │
-└── docs/                              ← 项目进展记录
-    ├── status/                        ← 阶段性小结
-    └── ...
+└── data/                              ← **不推**：本地原始数据（你粘来的 ~86 GB）
+    └── TCGA-LUAD-WSI/                 ← DICOM WSI 大文件
 ```
+
+**两个代码库的关系**：
+- `pipeline/` 当前跑 **DICOM（TCGA-LUAD）**——开发期 sanity check 9-gene 框架
+- `project_resources/sdpc_pipeline/tools/` 是 **.sdpc（中日冰冻切片）**——最终生产 pipeline
+- 两者都进 repo；最终训练入口要从 DICOM 迁到 SDPC
 
 ---
 
@@ -140,7 +153,7 @@ pip install -r requirements.txt
 
 ```bash
 # UNI (~1.2 GB)
-wget -O models/UNI/assets/ckpts/uni/pytorch_model.bin \
+wget -O UNI/assets/ckpts/uni/pytorch_model.bin \
   https://huggingface.co/MahmoodLab/UNI/resolve/main/pytorch_model.bin
 
 # CTransPath (~800 MB, already in DeepGEM repo)
@@ -150,27 +163,37 @@ wget -O models/UNI/assets/ckpts/uni/pytorch_model.bin \
 ### 4. 准备 data（**不**进 repo）
 
 ```bash
-# 1. TCGA-LUAD WSI 从 IDC 下载 → 50 case, ~86 GB
-bash transfer_package/data_download/*.sh
-# 2. MC3 v0.2.8 PUBLIC MAF (~700 MB)
-# 3. 9-gene panel labels CSV (已经在这个 repo 里: transfer_package/02_data_public/9gene_panel_LUAD.csv)
+# 1. TCGA-LUAD WSI 从 IDC 下载 → 50 case, ~6 GB
+python -c "
+from idc_index import IDCClient
+c = IDCClient()
+import json
+ids = json.load(open('project_resources/data_public/picked_50_case_ids.json'))
+c.download_from_selection(downloadDir='./data/TCGA-LUAD-WSI/dicom/', collection_id='tcga_luad', patientId=ids)
+"
+# 2. MC3 v0.2.8 PUBLIC MAF (~700 MB) — 走 Synapse PAT
+python project_resources/sdpc_pipeline/tools/download_mc3_maf.py
+# 3. 9-gene panel labels CSV (已经在这个 repo 里: project_resources/data_public/9gene_panel_LUAD.csv)
 ```
 
-### 5. 跑 pipeline
+### 5. 跑 pipeline（DICOM 开发期 / SDPC 生产期）
 
 ```bash
-# 步骤 1: 切 patch（256×256, multi-slice）
+# === 开发期：DICOM pipeline（当前 sanity check 路线）===
 python pipeline/extract_patches_direct.py \
-  --dicom ./transfer_package/data/TCGA-LUAD-WSI/dicom/tcga_luad \
+  --dicom ./data/TCGA-LUAD-WSI/dicom/tcga_luad \
   --out   ./patches \
-  --cases ./transfer_package/02_data_public/picked_50_case_ids.json
+  --cases ./project_resources/data_public/picked_50_case_ids.json
 
-# 步骤 2: 抽 CTransPath features
 python pipeline/deepgem_test/step2_extract_ctranspath.py \
   --patches ./patches \
-  --ctranspath ./models/DeepGEM/checkpoints/pretrain/ctranspath.pth
+  --ctranspath ./DeepGEM/checkpoints/pretrain/ctranspath.pth
 
-# 步骤 3-5: 喂 DeepGEM 训好的模型 / 或自己训 ABMIL
+# === 生产期：SDPC pipeline（最终路线，工具已就绪等合作方数据）===
+python project_resources/sdpc_pipeline/tools/extract_patches.py \
+  --sdpc-dir ./data/中日冰冻切片 \
+  --out-dir ./patches_sdpc \
+  --workers 8
 ```
 
 ---

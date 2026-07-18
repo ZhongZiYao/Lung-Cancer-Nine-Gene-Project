@@ -41,13 +41,19 @@ Thumbs.db
 # 这些是项目缓存/patches/features/weights/checkpoints
 # 不要 commit 这些,不是单一来源,可由 pipeline 重新生成
 
-# 原始数据 (TCGA-LUAD 86+ GB)
-transfer_package/data/
-transfer_package/data/_sdpc_evidence/
-transfer_package/data/_xlsx_dump/
-transfer_package/data/_xlsx_dump_v2/
-transfer_package/data/MC3/
-transfer_package/data/TCGA-LUAD-WSI/
+# ----- 大原始数据 (DICOM / .sdpc / MC3) -----
+# 根 data/ — 你粘过来的 ~86 GB 原始数据
+data/
+# project_resources 内任何大文件残留
+project_resources/data/
+project_resources/data/_sdpc_evidence/
+project_resources/data/_xlsx_dump/
+project_resources/data/_xlsx_dump_v2/
+project_resources/data/MC3/
+project_resources/data/TCGA-LUAD-WSI/
+
+# ----- 旧 Claude 会话记忆 (路径已过期,别进 repo) -----
+.claude/_old_memory/
 
 # pipeline 缓存 (patches JPG / features npy / per-patch pkl)
 pipeline/deepgem_test/patches/
@@ -103,6 +109,13 @@ UNI/assets/data/
 
 # 中日合作项目 (冰冻切片, 数据敏感)
 中日冰冻切片/
+
+# ----- SDPC pipeline 内部数据 -----
+# SDPC 抽样数据 (元数据 CSV / JSON,跟训练契约无关)
+project_resources/sdpc_pipeline/sample_data/
+# SDPC 抽 patch 临时输出
+project_resources/sdpc_pipeline/patches/
+project_resources/sdpc_pipeline/features/
 
 # 论文/报告生成脚本 (非项目主线)
 gen_research_report.py
