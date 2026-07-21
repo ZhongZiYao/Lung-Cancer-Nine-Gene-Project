@@ -128,3 +128,9 @@ Paper-ZhongGAMIL/
 # ----- Logs -----
 *.log
 logs/
+
+# ----- Week-1 baseline: 大型中间产物 -----
+# 抽出的 patch 特征(80 MB+),不传 git,clone 后服务器有
+pipeline/week_1_baseline/outputs/features_per_case/*.npz
+pipeline/week_1_baseline/outputs/bags_per_case/*.npz
+# 但训练结果 csv/PNG/figure 还是要 push
