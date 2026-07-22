@@ -1,0 +1,31 @@
+============================================================
+Week-1 Baseline 报告 — 9-gene Lung Adenocarcinoma Mutation
+============================================================
+Case 数: 83
+CV: 5-fold StratifiedKFold (by any_positive)
+Backbone: UNI (1024-dim, frozen)
+模型: GAMIL-style Gated Attention + DeepGEM-style prototype
+
+── 全 9 基因 ──
+  EGFR    n_pos=13  AUC=0.503  F1@best=0.3076923076923077
+  KRAS    n_pos=22  AUC=0.507  F1@best=0.3125
+  ALK     n_pos=11  AUC=0.441  F1@best=0.15384615384615385
+  ROS1    n_pos= 5  AUC=0.513  F1@best=0.13513513513513514
+  TP53    n_pos=56  AUC=0.503  F1@best=0.475
+  BRAF    n_pos= 9  AUC=0.583  F1@best=0.25396825396825395
+  PIK3CA  n_pos= 6  AUC=0.377  F1@best=0.14285714285714285
+  ERBB2   n_pos= 6  AUC=0.487  F1@best=0.2857142857142857
+  NRAS    n_pos= 2  AUC=0.698  F1@best=0.10256410256410256
+
+── 高频组 (mean AUC) ──
+  ALK, BRAF, EGFR, KRAS, TP53
+  mean = 0.507 (min=0.441, max=0.583)
+── 低频组 (mean AUC) ──
+  ERBB2, NRAS, PIK3CA, ROS1
+  mean = 0.518 (min=0.377, max=0.698)
+
+全部有效 AUC 数: 9/9
+
+⚠️ 注意: 83 case 训练,NRAS(2 例)等低频基因 AUC 方差大,
+   实际数字应配合置信区间/不同 seed 看。
+============================================================

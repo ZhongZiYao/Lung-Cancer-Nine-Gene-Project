@@ -1,13 +1,12 @@
 # Week-1 Baseline — 9 基因小模型(组会汇报用)
 
-> ⚠️ **当前状态(2026-07-21 14:40)**: 后台跑全量 pipeline 中
-> - **Step 1**(UNI 抽特征): 34/83 case 已抽完(~41%),后台跑约 2.5 小时可抽完全部
-> - **Step 2/3/4**: 等 Step 1 完自动接,Step 3 训练(CPU)需 15-20 小时
-> - **预计明早 ~10:30 全部完成**(到明早 11 点前可看结果)
-> - **后台 PID**: 937159(主) / 937186(step1)
-> - **日志**: `logs/step1_20260721_120540.log` 等
+> ⚠️ **当前状态(2026-07-21 20:36)**: 
+> - **Step 1 + Step 2**: ✅ 完成(83/83 case)
+> - **Step 3**: 已杀掉旧进程(旧代码不带进度,可视化补丁已加),用 `bash pipeline/week_1_baseline/run_step3_only.sh` 重启
+> - **Step 4**: 等 Step 3 自动接
+> - **可视化**: 新加 `flush_print` + case-by-case 进度条 + 实时监控仪表盘 `monitor_train.sh`
 >
-> ⚠️ **数据状态**: `outputs/features_per_case/` 当前有 34 个 .npz。**不要 git push** 这些 .npz(单 case ~1 MB × 83 ≈ 80 MB);训练结果 csv/PNG 必 push,代码必 push
+> ⚠️ **数据状态**: `outputs/features_per_case/` 83 个 .npz + `bags_per_case/` 83 个 .npz。**不要 git push** 这些 .npz(单 case ~1 MB × 83 ≈ 80 MB);训练结果 csv/PNG 必 push,代码必 push
 
 ---
 
@@ -73,33 +72,57 @@ bash pipeline/week_1_baseline/run_full_pipeline.sh
 bash pipeline/week_1_baseline/stop_pipeline.sh
 ```
 
+### 只跑 Step 3 (Step 1/2 已跑完时)
+
+```bash
+bash pipeline/week_1_baseline/run_step3_only.sh
+# 自动接 step4 出图
+```
+
 ---
 
 ## 🔧 监控进度
 
-### 实时监控(每 5 秒刷新全屏)
+### 实时训练仪表盘(每 5 秒刷新,推荐 — 看 loss 趋势 + 分基因 AUC)
 
 ```bash
-bash pipeline/week_1_baseline/monitor.sh
+bash pipeline/week_1_baseline/monitor_train.sh
 ```
 显示:
 ```
-═══════════════════════════════════════════════════
-  Week-1 Baseline 监控
-  时间: 2026-07-21 14:40:23
-═══════════════════════════════════════════════════
-▶ Case 进度
-  step1 已抽 case: 34 / 83
-  step2 已打 bag:  0
-  step3 ⏳ 训练中
-▶ 后台进程
-  ✓ 主进程 937159 活着
-  - PID=937186  CPU=1721%  CPU_TIME=2475:41
-▶ GPU 状态
-  GPU0: used=20417  free=3792  util=100%
-  GPU1: used=19679  free=4532  util=100%
-═══════════════════════════════════════════════════
-  Ctrl+C 退出
+╔════════════════════════════════════════════════════════════════╗
+║  Week-1 Baseline 训练实时监控                                  ║
+║  时间: 2026-07-21 20:45:00                                     ║
+╚════════════════════════════════════════════════════════════════╝
+▶ 全局进度
+  fold:       Fold 1/5
+  当前 case:  45/66
+  全局:       全局 1980/13888 (14.3%)
+  ETA:        ~6 小时 12 分钟   (avg epoch 142s × 157 剩余 epoch)
+▶ 训练 loss 趋势 (最近 8 个值, max=0.95)
+    ep1: ███████ 0.952
+    ep2: ██████ 0.832
+    ep3: █████ 0.711
+    ...
+▶ 验证 mean AUC 趋势 (最近 8 个值, max=0.65)
+    ep1: ████████ 0.523
+    ep2: ██████████ 0.612
+    ...
+▶ 资源
+  step3: PID=1055282  CPU=1457%  CPU_TIME=2430:12  RSS=0.9 GB
+  GPU0: util=100% mem=22971/24576 MiB
+  内存: used=8.2GB total=125GB
+▶ 最新日志 (tail -8)
+  >>> ep3: loss=0.711 val_mean_auc=0.612 (142s)
+      per-gene AUC: EGFR=0.54 KRAS=0.65 ALK=0.52 ROS1=N/A TP53=0.71 BRAF=0.55 PIK3CA=N/A ERBB2=N/A NRAS=N/A
+      [fold1/5 ep4/50] case 5/66  loss_so_far=0.692  全局 2095/13888 (15.1%)
+═══════════════════════════════════════════════════════════════════
+```
+
+### 基础监控(每 5 秒刷 case 数 + GPU)
+
+```bash
+bash pipeline/week_1_baseline/monitor.sh
 ```
 
 ### 单点查询(快速)
