@@ -107,13 +107,15 @@ class PrototypeLayer(nn.Module):
 
 # ─────────────── 4. 主模型 ───────────────
 class DeepGEMStyleModel(nn.Module):
-    def __init__(self, in_dim: int = 1024, hidden_dim: int = 512,
-                 num_genes: int = 9, dropout: float = 0.25):
+    def __init__(self, in_dim: int = 1024, hidden_dim: int = 128,
+                 num_genes: int = 9, dropout: float = 0.5):
         super().__init__()
         self.backbone = PatchBackbone(in_dim, hidden_dim, dropout)
         self.sm_attn = GatedAttention(hidden_dim)
         self.case_attn = GatedAttention(hidden_dim)
         self.prototype = PrototypeLayer(hidden_dim, num_genes)
+        # 残差投影:从原 in_dim 投到 hidden_dim(默认同 hidden_dim,降低参数)
+        self.residual_dim = hidden_dim  # 已经是 256 了
 
         self.bag_head = nn.Linear(hidden_dim, num_genes)
         self.instance_attn = GatedAttention(num_genes)

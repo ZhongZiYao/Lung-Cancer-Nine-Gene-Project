@@ -134,3 +134,10 @@ logs/
 pipeline/week_1_baseline/outputs/features_per_case/*.npz
 pipeline/week_1_baseline/outputs/bags_per_case/*.npz
 # 但训练结果 csv/PNG/figure 还是要 push
+
+# ----- v1 baseline 备份(176 MB,本机保留,不传 git) -----
+pipeline/week_1_baseline/outputs_v1_baseline/
+
+# ----- filtered 实验数据(也是大 .npz) -----
+pipeline/week_1_baseline/outputs/features_per_case_filtered/*.npz
+pipeline/week_1_baseline/outputs/bags_per_case_filtered/*.npz
