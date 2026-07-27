@@ -141,3 +141,9 @@ pipeline/week_1_baseline/outputs_v1_baseline/
 # ----- filtered 实验数据(也是大 .npz) -----
 pipeline/week_1_baseline/outputs/features_per_case_filtered/*.npz
 pipeline/week_1_baseline/outputs/bags_per_case_filtered/*.npz
+
+# ----- Week-1 v3 features/bags (大 npz,不传 git) -----
+pipeline/week_1_baseline/outputs/bags_v3/*.npz
+pipeline/week_1_baseline/outputs/features_v3/*.npz
+# ----- DeepGEM 特征目录(大 npz) -----
+deepgem_feat/

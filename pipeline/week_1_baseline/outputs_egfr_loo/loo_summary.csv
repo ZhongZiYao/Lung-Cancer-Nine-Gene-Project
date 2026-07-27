@@ -1,0 +1,4 @@
+case_id,true_EGFR,pred_prob_EGFR,best_val_auc,stopped_epoch,pos_weight,n_train,n_val
+TCGA-05-4244,0,0.004575,-1.0,5,2.0,2,1
+TCGA-05-4249,0,0.001788,-1.0,5,2.0,2,1
+TCGA-05-4250,0,0.003891,-1.0,5,2.0,2,1

@@ -1,0 +1,18 @@
+============================================================
+EGFR-only 报告
+============================================================
+Case 数: 83
+EGFR 阳性: 13, 阴性: 70
+CV: 5-fold StratifiedKFold (by any_positive)
+Backbone: UNI (1024-dim, frozen)
+模型: EGFROnlyModel hidden_dim=128, dropout=0.5, wd=0.0001
+
+── OOF AUC ──
+  EGFR: 0.584
+
+── 各 fold val best AUC ──
+  Fold 1: 0.700
+  Fold 2: 0.738
+  Fold 3: 0.429
+  Fold 4: 0.769
+  Fold 5: 0.821

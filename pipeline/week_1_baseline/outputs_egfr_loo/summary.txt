@@ -1,0 +1,20 @@
+============================================================
+EGFR-only LOO 报告
+============================================================
+Case 数: 3  (EGFR+: 0, EGFR-: 3)
+CV: Leave-One-Out
+Backbone: UNI (1024-dim, frozen)
+模型: EGFROnlyModel hidden_dim=64, dropout=0.5, wd=0.0001
+Train/val/test 划分: 留 1 case 当 test;训练集按 EGFR 分层 抽 10% 当 val 早停;余下训练
+超参: lr=0.0001, epochs=20, patience=5
+
+── OOF AUC ──
+  EGFR: nan
+
+── 预测概率统计 ──
+  EGFR+: mean=nan median=nan std=nan
+  EGFR-: mean=0.003 median=0.004 std=0.001
+
+── 早停 epoch 统计 ──
+  mean=5.0 median=5 max=5
+  (用满 epochs 数量 = 0)

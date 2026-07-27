@@ -1,0 +1,24 @@
+============================================================
+EGFR-only 方案 A:固定 70/15/15 分层切分
+============================================================
+Case 总数: 83  (EGFR+: 13)
+
+── 切分(按 any_9gene_positive 分层)──
+  train: 58  (EGFR+=9)
+  val  : 12  (EGFR+=2)
+  test : 13  (EGFR+=2)
+
+── 模型/超参 ──
+  EGFROnlyModel hidden_dim=64, dropout=0.5, wd=0.0001
+  lr=0.0001, epochs=80, patience=15
+  train pos_weight=5.444
+  best val AUC = 0.550 (stopped at epoch 26)
+
+── 最终评估 ──
+  val  AUC = 0.550  (n=12)
+  test AUC = 0.318  (n=13)
+
+── 备注 ──
+  test 集只有 2 个 EGFR+ 样本,AUC 估计抖动大。
+  真实评估请用 LOO 结果(`step3_egfr_loo.py`)。
+  本方案 A 用途:模型选择 + 训练/val/test 流程演练。

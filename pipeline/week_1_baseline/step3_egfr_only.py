@@ -20,10 +20,20 @@ CV:5-fold StratifiedKFold(by any_positive)
 from __future__ import annotations
 import argparse
 import csv
+import functools
 import sys
 import time
 import warnings
 from pathlib import Path
+
+# 强制 unbuffered(双保险;即使外层没用 python -u,也能逐行 flush)
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
+print = functools.partial(print, flush=True)
 
 import numpy as np
 import torch
@@ -77,7 +87,7 @@ def train_one_fold(train_cases, val_cases, bags_dir, labels,
         val_ds, batch_size=1, shuffle=False, num_workers=0, collate_fn=collate
     )
 
-    model = EGFROnlyModel(in_dim=1024, hidden_dim=hidden_dim, dropout=args.dropout).to(device)
+    model = EGFROnlyModel(in_dim=1024, hidden_dim=hidden_dim, dropout=dropout).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # pos_weight
@@ -148,12 +158,12 @@ def train_one_fold(train_cases, val_cases, bags_dir, labels,
             best_case_ids = case_ids
             best_labels = lbls
             epochs_no_improve = 0
-            print("  ✓ best")
+            print("  [best]")
         else:
             epochs_no_improve += 1
             print(f"  ({epochs_no_improve}/{patience})")
         if epochs_no_improve >= patience:
-            print(f"    早停 at epoch {epoch}")
+            print(f"    early stop at epoch {epoch}")
             break
 
     if best_preds is None:
@@ -291,9 +301,9 @@ def main():
         f.write("\n── 各 fold val best AUC ──\n")
         for r in fold_results:
             f.write(f"  Fold {r['fold']}: {r['best_auc']:.3f}\n")
-    print(f"\n[Step3-EGFR] predictions → {out_dir}/egfr_only_predictions.csv")
-    print(f"[Step3-EGFR] summary → {out_dir}/summary.txt")
-    print("\n[Step3-EGFR] 完成 ✓")
+    print(f"\n[Step3-EGFR] predictions -> {out_dir}/egfr_only_predictions.csv")
+    print(f"[Step3-EGFR] summary -> {out_dir}/summary.txt")
+    print("\n[Step3-EGFR] done")
 
 
 if __name__ == "__main__":
