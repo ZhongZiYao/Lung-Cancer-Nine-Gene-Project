@@ -1,0 +1,4 @@
+KRAS LR baseline (feat_416)
+  case: 415  pos=150  neg=265
+  best aggregation: p10+p90
+  3-fold OOF AUC = 0.570

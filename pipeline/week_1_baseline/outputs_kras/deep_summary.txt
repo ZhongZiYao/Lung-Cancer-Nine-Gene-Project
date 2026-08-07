@@ -1,0 +1,4 @@
+KRAS deep model (feat_416, DeepGEM-style)
+  case: 415  pos=150  neg=265
+  5-fold OOF AUC = 0.501
+  fold AUCs: [0.421, 0.479, 0.582, 0.478, 0.532]

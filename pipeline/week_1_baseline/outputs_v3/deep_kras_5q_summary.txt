@@ -1,0 +1,9 @@
+KRAS deep model (5 learnable queries, DeepGEM-strict)
+  data: deepgem_feat_v3 (40 case, 11 pos)
+  5-fold CV ¡Á 3 random seeds
+  model: EGFROnlyModel(dim=32, depth=3, num_queries=5, dropout=0.2)
+  epochs=15, lr=5e-4, wd=1e-4
+  seeds: [42, 7, 123]
+  per-seed AUC: [0.5830721003134796, 0.6332288401253918, 0.5893416927899686]
+  mean AUC = 0.602 ¡À 0.022
+  averaged OOF AUC = 0.655

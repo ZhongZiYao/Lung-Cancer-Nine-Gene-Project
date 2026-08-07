@@ -1,0 +1,7 @@
+ABMIL baseline — KRAS — feat_416 (UNI 1024-dim)
+Config: hidden=256 attn=128 dropout=0.25 LR=0.0002 bs=4 epoch=50 patience=10
+Folds: 5  Seeds: 1
+
+per-seed OOF AUC : [0.4824150943396227]
+mean ± std       : 0.4824 ± 0.0000
+averaged OOF AUC : 0.4824
