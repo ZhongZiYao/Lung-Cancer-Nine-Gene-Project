@@ -43,7 +43,7 @@ import torch.nn.functional as F
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).parent))
 
-from egfr_only_model import EGFROnlyModel
+from egfr_only_model import EGFROnlyModel, compute_egfr_loss, PartialLoss
 
 
 # ─────────────── 数据 ───────────────
@@ -58,11 +58,35 @@ class CaseDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         cid = self.cases[i]
-        d = np.load(self.bags_dir / f"{cid}.npz", allow_pickle=True)
+        npz_path = self.bags_dir / f"{cid}.npz"
+        # 鲁棒:文件损坏时跳过(等后台写完)
+        if not npz_path.exists():
+            raise FileNotFoundError(f"{cid}: npz not found")
+        for attempt in range(3):
+            try:
+                d = np.load(npz_path, allow_pickle=True)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise RuntimeError(f"{cid}: npz corrupt after 3 retries")
+                import time as _time
+                _time.sleep(0.5)
+        # 兼容两种 npz 字段:
+        #   旧 (bags_v3, bags_per_case): 'patch_features'
+        #   新 (deepgem_feat, deepgem_feat_v2): 'features'
+        if "patch_features" in d.files:
+            feats = d["patch_features"]
+        elif "features" in d.files:
+            feats = d["features"]
+        else:
+            raise KeyError(f"{cid}: npz 无 'patch_features'/'features' 字段, keys={d.files}")
+        # 兼容 slice_ids: 新版只有 1 个 SM 时也是 int32
+        sm = d["slice_ids"] if "slice_ids" in d.files else np.zeros(len(feats), dtype=np.int32)
+        d.close()
         return {
             "case_id": cid,
-            "patch_feats": torch.from_numpy(d["patch_features"]).float(),
-            "sm_indices": torch.from_numpy(d["slice_ids"]).long(),
+            "patch_feats": torch.from_numpy(feats).float(),
+            "sm_indices": torch.from_numpy(sm).long(),
             "label": torch.tensor(self.labels[cid], dtype=torch.float32),
         }
 
@@ -87,8 +111,11 @@ def train_one_fold(train_cases, val_cases, bags_dir, labels,
         val_ds, batch_size=1, shuffle=False, num_workers=0, collate_fn=collate
     )
 
-    model = EGFROnlyModel(in_dim=1024, hidden_dim=hidden_dim, dropout=dropout).to(device)
+    # dim 是 hidden_dim 别名 (兼容旧命令行参数)
+    model = EGFROnlyModel(in_dim=1024, dim=hidden_dim, depth=3, dropout=dropout).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # PartialLoss 在 train_one_fold 内部维护(每个 fold 重新初始化)
+    # 因为 case 不同,patch 数也不同
 
     # pos_weight
     train_labels = np.array([labels[c] for c in train_cases])
@@ -114,9 +141,24 @@ def train_one_fold(train_cases, val_cases, bags_dir, labels,
             sm_idx = batch["sm_indices"].to(device)
             label = batch["label"].to(device).unsqueeze(0)  # [1]
             n_sm = int(sm_idx.max().item()) + 1
-            logit, _ = model(patch_feats, sm_idx, n_sm)
-            loss = F.binary_cross_entropy_with_logits(
-                logit.unsqueeze(0), label, pos_weight=pos_weight_t
+            logit, instance_logits, _ = model(patch_feats, sm_idx, n_sm)
+            # DeepGEM 风格: bag_loss + λ * PartialLoss
+            N = patch_feats.shape[0]
+            # 初始化或复用 partial_loss (每个 fold 一个)
+            if not hasattr(train_one_fold, '_partial_loss') or \
+               train_one_fold._partial_loss.confidence.shape[0] != N:
+                train_one_fold._partial_loss = PartialLoss(
+                    num_patches=N, num_classes=2,
+                ).to(device)
+            partial_loss = train_one_fold._partial_loss
+            batch_indices = torch.arange(N, device=device)
+            loss, bag_loss, part_loss = compute_egfr_loss(
+                logit, instance_logits, label,
+                partial_loss, batch_indices,
+                pos_weight_bag=float(pos_weight_t.item()),
+                pos_weight_patch=1.0,
+                lambda_partial=0.3,
+                conf_ema_m=0.95 - 0.15 * (epoch - 1) / max(epochs - 1, 1),
             )
             optimizer.zero_grad()
             loss.backward()
@@ -136,7 +178,7 @@ def train_one_fold(train_cases, val_cases, bags_dir, labels,
                 sm_idx = batch["sm_indices"].to(device)
                 label = batch["label"]
                 n_sm = int(sm_idx.max().item()) + 1
-                logit, _ = model(patch_feats, sm_idx, n_sm)
+                logit, _, _ = model(patch_feats, sm_idx, n_sm)
                 p = torch.sigmoid(logit).cpu().numpy()
                 case_ids.append(cid)
                 preds.append(float(p))
@@ -220,7 +262,19 @@ def main():
     bags_dir = Path(args.bags_dir)
     n_avail = len(list(bags_dir.glob("*.npz")))
     print(f"[Step3-EGFR] bags 目录下有 {n_avail} 个 case 的 .npz")
-    available = set(p.stem for p in bags_dir.glob("*.npz"))
+    # 过滤:文件存在 + 可读(避免并发写入的损坏 npz)
+    available = []
+    skipped_corrupt = []
+    for p in bags_dir.glob("*.npz"):
+        try:
+            d = np.load(p, allow_pickle=True)
+            _ = d["features"].shape
+            d.close()
+            available.append(p.stem)
+        except Exception:
+            skipped_corrupt.append(p.stem)
+    if skipped_corrupt:
+        print(f"[Step3-EGFR] 跳过 {len(skipped_corrupt)} 个损坏 npz: {skipped_corrupt[:5]}{'...' if len(skipped_corrupt)>5 else ''}")
     cases = [c for c in cases if c in available]
     print(f"[Step3-EGFR] 实际可训: {len(cases)} case, EGFR+={sum(labels[c] for c in cases)}")
 

@@ -45,7 +45,7 @@ import torch.nn.functional as F
 warnings.filterwarnings("ignore")
 sys.path.insert(0, str(Path(__file__).parent))
 
-from egfr_only_model import EGFROnlyModel
+from egfr_only_model import EGFROnlyModel, compute_egfr_loss, PartialLoss
 
 
 # ─────────────── 数据 ───────────────
@@ -60,11 +60,30 @@ class CaseDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         cid = self.cases[i]
-        d = np.load(self.bags_dir / f"{cid}.npz", allow_pickle=True)
+        npz_path = self.bags_dir / f"{cid}.npz"
+        if not npz_path.exists():
+            raise FileNotFoundError(f"{cid}: npz not found")
+        for attempt in range(3):
+            try:
+                d = np.load(npz_path, allow_pickle=True)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise RuntimeError(f"{cid}: npz corrupt after 3 retries")
+                import time as _time
+                _time.sleep(0.5)
+        if "patch_features" in d.files:
+            feats = d["patch_features"]
+        elif "features" in d.files:
+            feats = d["features"]
+        else:
+            raise KeyError(f"{cid}: npz 无 'patch_features'/'features' 字段, keys={d.files}")
+        sm = d["slice_ids"] if "slice_ids" in d.files else np.zeros(len(feats), dtype=np.int32)
+        d.close()
         return {
             "case_id": cid,
-            "patch_feats": torch.from_numpy(d["patch_features"]).float(),
-            "sm_indices": torch.from_numpy(d["slice_ids"]).long(),
+            "patch_feats": torch.from_numpy(feats).float(),
+            "sm_indices": torch.from_numpy(sm).long(),
             "label": torch.tensor(self.labels[cid], dtype=torch.float32),
         }
 
@@ -90,7 +109,7 @@ def train_with_es(train_cases, val_cases, bags_dir, labels,
         val_ds, batch_size=1, shuffle=False, num_workers=0, collate_fn=collate
     )
 
-    model = EGFROnlyModel(in_dim=1024, hidden_dim=hidden_dim, dropout=dropout).to(device)
+    model = EGFROnlyModel(in_dim=1024, dim=hidden_dim, depth=3, dropout=dropout).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     train_labels = np.array([labels[c] for c in train_cases])
@@ -115,9 +134,22 @@ def train_with_es(train_cases, val_cases, bags_dir, labels,
             sm_idx = batch["sm_indices"].to(device)
             label = batch["label"].to(device).unsqueeze(0)
             n_sm = int(sm_idx.max().item()) + 1
-            logit, _ = model(patch_feats, sm_idx, n_sm)
-            loss = F.binary_cross_entropy_with_logits(
-                logit.unsqueeze(0), label, pos_weight=pos_weight_t
+            logit, instance_logits, _ = model(patch_feats, sm_idx, n_sm)
+            N = patch_feats.shape[0]
+            if not hasattr(train_with_es, '_partial_loss') or \
+               train_with_es._partial_loss.confidence.shape[0] != N:
+                train_with_es._partial_loss = PartialLoss(
+                    num_patches=N, num_classes=2,
+                ).to(device)
+            partial_loss = train_with_es._partial_loss
+            batch_indices = torch.arange(N, device=device)
+            loss, _, _ = compute_egfr_loss(
+                logit, instance_logits, label,
+                partial_loss, batch_indices,
+                pos_weight_bag=float(pos_weight_t.item()),
+                pos_weight_patch=1.0,
+                lambda_partial=0.3,
+                conf_ema_m=0.95 - 0.15 * (epoch - 1) / max(epochs - 1, 1),
             )
             optimizer.zero_grad()
             loss.backward()
@@ -135,7 +167,7 @@ def train_with_es(train_cases, val_cases, bags_dir, labels,
                 sm_idx = batch["sm_indices"].to(device)
                 label = batch["label"]
                 n_sm = int(sm_idx.max().item()) + 1
-                logit, _ = model(patch_feats, sm_idx, n_sm)
+                logit, _, _ = model(patch_feats, sm_idx, n_sm)
                 preds.append(float(torch.sigmoid(logit).cpu().numpy()))
                 lbls.append(int(label.item()))
         y_v = np.array(lbls)
@@ -178,11 +210,27 @@ def predict_cases(model, cases, bags_dir, device):
     model.eval()
     out = []
     for cid in cases:
-        d = np.load(bags_dir / f"{cid}.npz", allow_pickle=True)
-        patch_feats = torch.from_numpy(d["patch_features"]).float().to(device)
-        sm_idx = torch.from_numpy(d["slice_ids"]).long().to(device)
+        npz_path = bags_dir / f"{cid}.npz"
+        for attempt in range(3):
+            try:
+                d = np.load(npz_path, allow_pickle=True)
+                break
+            except Exception:
+                if attempt == 2:
+                    raise RuntimeError(f"{cid}: npz corrupt after 3 retries")
+                import time as _time
+                _time.sleep(0.5)
+        if "patch_features" in d.files:
+            feats = d["patch_features"]
+        elif "features" in d.files:
+            feats = d["features"]
+        else:
+            raise KeyError(f"{cid}: npz 无 'patch_features'/'features' 字段")
+        sm = d["slice_ids"] if "slice_ids" in d.files else np.zeros(len(feats), dtype=np.int32)
+        patch_feats = torch.from_numpy(feats).float().to(device)
+        sm_idx = torch.from_numpy(sm).long().to(device)
         n_sm = int(sm_idx.max().item()) + 1
-        logit, _ = model(patch_feats, sm_idx, n_sm)
+        logit, _, _ = model(patch_feats, sm_idx, n_sm)
         p = float(torch.sigmoid(logit).cpu().numpy())
         out.append({"case_id": cid, "pred": p})
     return out
@@ -228,7 +276,19 @@ def main():
           f"EGFR+={sum(egfr_label.values())}, any_pos+={sum(any_pos.values())}")
 
     bags_dir = Path(args.bags_dir)
-    available = set(p.stem for p in bags_dir.glob("*.npz"))
+    # 过滤:文件存在 + 可读(避免损坏 npz)
+    available = []
+    skipped_corrupt = []
+    for p in bags_dir.glob("*.npz"):
+        try:
+            d = np.load(p, allow_pickle=True)
+            _ = d["features"].shape
+            d.close()
+            available.append(p.stem)
+        except Exception:
+            skipped_corrupt.append(p.stem)
+    if skipped_corrupt:
+        print(f"[Step3-EGFR-Split] 跳过 {len(skipped_corrupt)} 个损坏 npz")
     cases = [c for c in cases if c in available]
     print(f"[Step3-EGFR-Split] 实际可训: {len(cases)} case, "
           f"EGFR+={sum(egfr_label[c] for c in cases)}")

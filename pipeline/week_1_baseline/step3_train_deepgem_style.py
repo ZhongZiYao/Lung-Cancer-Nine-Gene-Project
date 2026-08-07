@@ -57,12 +57,19 @@ class CaseDataset(torch.utils.data.Dataset):
     def __getitem__(self, i):
         cid = self.cases[i]
         d = np.load(self.bags_dir / f"{cid}.npz", allow_pickle=True)
+        if "patch_features" in d.files:
+            feats = d["patch_features"]
+        elif "features" in d.files:
+            feats = d["features"]
+        else:
+            raise KeyError(f"{cid}: npz 无 'patch_features'/'features' 字段, keys={d.files}")
+        sm = d["slice_ids"] if "slice_ids" in d.files else np.zeros(len(feats), dtype=np.int32)
         return {
             "case_id": cid,
-            "patch_feats": torch.from_numpy(d["patch_features"]).float(),  # [N, 1024]
-            "sm_indices": torch.from_numpy(d["slice_ids"]).long(),          # [N]
+            "patch_feats": torch.from_numpy(feats).float(),  # [N, 1024]
+            "sm_indices": torch.from_numpy(sm).long(),       # [N]
             "label": torch.tensor([self.labels[cid][g] for g in GENES],
-                                  dtype=torch.float32),                     # [9]
+                                  dtype=torch.float32),      # [9]
         }
 
 

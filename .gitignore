@@ -147,3 +147,11 @@ pipeline/week_1_baseline/outputs/bags_v3/*.npz
 pipeline/week_1_baseline/outputs/features_v3/*.npz
 # ----- DeepGEM 特征目录(大 npz) -----
 deepgem_feat/
+
+# ----- 8/7 清理: 大仓库/特征不入仓 -----
+TRIDENT/
+deepgem_feat_v2/
+deepgem_feat_v3/
+deepgem_feat_v3_titan/
+feat_416/
+models/TITAN/
