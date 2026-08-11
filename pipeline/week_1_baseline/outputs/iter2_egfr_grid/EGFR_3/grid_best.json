@@ -1,0 +1,9 @@
+{
+  "best_cfg": {
+    "hidden_dim": 64,
+    "dropout": 0.5,
+    "lr": 0.0005
+  },
+  "best_auc": 0.6314620039749,
+  "n_results": 3
+}

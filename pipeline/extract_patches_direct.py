@@ -89,8 +89,15 @@ def find_all_volume_series(case_dir: Path, modality: str = "SM") -> list[tuple[P
             series_names = sorted(os.listdir(str(sp)))
         except Exception:
             continue
-        for sname2 in series_names:
-            series = sp / sname2
+        # IDC 新版本下载: 可能是 case/{SM_uid}/ 直链 (无 study 中间层)
+        # 老版本: case/{study}/{SM_uid}/
+        # 这里判断如果 sname 是 SM_xxx, 把它当作 series 处理
+        if sname.startswith(f"{modality}_"):
+            candidate_series = [case_dir / sname]
+        else:
+            candidate_series = [sp / sname2 for sname2 in series_names
+                                if sname2.startswith(f"{modality}_")]
+        for series in candidate_series:
             if not series.is_dir() or not series.name.startswith(f"{modality}_"):
                 continue
             try:
@@ -101,8 +108,10 @@ def find_all_volume_series(case_dir: Path, modality: str = "SM") -> list[tuple[P
             if not files:
                 continue
             # 遍历所有 .dcm,找一个 VOLUME (非 THUMBNAIL) 拿 TPM
+            # 如没有 VOLUME, fallback 到最大的 THUMBNAIL (768+ pixel 通常够小 patch)
             best_h, best_w = 0, 0
-            found_volume = False
+            found_any = False
+            is_volume = False
             for fp in files:
                 fp_str = _win_long(str(fp))
                 try:
@@ -112,18 +121,33 @@ def find_all_volume_series(case_dir: Path, modality: str = "SM") -> list[tuple[P
                     print(f"      [warn] skip {fp.name}: {type(e).__name__}: {e}")
                     continue
                 it = list(d.get("ImageType", []))
-                if "THUMBNAIL" in it:
+                is_thumb = "THUMBNAIL" in it
+                is_vol = "VOLUME" in it
+                if is_thumb and is_vol:
+                    # VOLUME + THUMBNAIL 一起: 视为 VOLUME
+                    is_thumb = False
+                if not is_vol and not is_thumb:
+                    # 既不是 VOLUME 也不是 THUMBNAIL, 但是 SM series — 仍接受
+                    pass
+                if is_thumb:
+                    # 记录 (THUMBNAIL 也算可用 series)
+                    h = int(d.TotalPixelMatrixRows or 0)
+                    w = int(d.TotalPixelMatrixColumns or 0)
+                    if h > best_h:
+                        best_h, best_w = h, w
+                    found_any = True
+                    is_volume = False
                     continue
-                if "VOLUME" not in it:
-                    continue
+                # VOLUME (或 accepted non-thumb non-vol)
                 h = int(d.TotalPixelMatrixRows or 0)
                 w = int(d.TotalPixelMatrixColumns or 0)
-                if h > best_h:  # 最大的 VOLUME 决定 series 的 TPM
+                if h > best_h:
                     best_h, best_w = h, w
-                found_volume = True
-            if found_volume and best_h > 0 and best_w > 0:
-                out.append((series, best_h * best_w))
-    out.sort(key=lambda x: x[1], reverse=True)  # 大切片先切
+                found_any = True
+                is_volume = is_vol
+            if found_any and best_h > 0 and best_w > 0:
+                out.append((series, best_h * best_w, is_volume))
+    out.sort(key=lambda x: x[1], reverse=True)  # 大切片先切,VOLUME > THUMBNAIL
     return out
 
 
@@ -248,7 +272,7 @@ def extract_one_case(case_dir: Path,
     case_n_bg = 0
     case_n_tis = 0
 
-    for series_dir, area in series_list:
+    for series_dir, area, _is_volume in series_list:
         if verbose:
             print(f"  [{case_id}] series {series_dir.name[:40]}...  area={area}")
         # 挑 series 里最大的 .dcm (完整切片数据)
