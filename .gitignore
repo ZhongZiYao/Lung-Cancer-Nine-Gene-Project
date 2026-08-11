@@ -142,16 +142,35 @@ pipeline/week_1_baseline/outputs_v1_baseline/
 pipeline/week_1_baseline/outputs/features_per_case_filtered/*.npz
 pipeline/week_1_baseline/outputs/bags_per_case_filtered/*.npz
 
-# ----- Week-1 v3 features/bags (å¤§ npz,ä¸ä¼  git) -----
-pipeline/week_1_baseline/outputs/bags_v3/*.npz
-pipeline/week_1_baseline/outputs/features_v3/*.npz
-# ----- DeepGEM ç‰¹å¾ç›®å½•(å¤§ npz) -----
-deepgem_feat/
+# ===== 2026-08 ĞÂÔö: iter11-14 outputs + ¸÷ÖÖ model weights =====
+# TITAN_model Ä¿Â¼ (CONCH + TITAN È¨ÖØ + TCGA_TITAN_features.pkl 36MB)
+TITAN_model/
 
-# ----- 8/7 æ¸…ç†: å¤§ä»“åº“/ç‰¹å¾ä¸å…¥ä»“ -----
-TRIDENT/
-deepgem_feat_v2/
-deepgem_feat_v3/
-deepgem_feat_v3_titan/
-feat_416/
-models/TITAN/
+# DeepGEM checkpoints Ä¿Â¼ (ctranspath/TransPath È¨ÖØ ~1.5GB)
+DeepGEM/checkpoints/
+DeepGEM/sample.csv
+
+# UNI È¨ÖØÄ¿Â¼
+UNI/assets/ckpts/vit_large_patch16_224.dinov2.uni_mass100k/
+UNI/uni/config.json
+
+# deepgem_feat ´ó npz (422 case ¡Á 1000 patches)
+deepgem_feat/
+deepgem_combined_feat/
+deepgem_combined_feat_per_slice/
+deepgem_combined_feat_v3/
+deepgem_combined_feat_v3_case/
+
+# ¸÷ÖÖ csv Ô¤²âÊä³ö(¿ÉÖØÉú)
+egfr_pred*.csv
+egfr_pred_16case.csv
+egfr_pred_per_slice.csv
+egfr_pred_v3_case.csv
+deepgem_internal_*.pickle
+
+# step3 features_v3 (´ó npz)
+pipeline/week_1_baseline/outputs/features_v3/
+pipeline/week_1_baseline/outputs/bags_v3/
+
+# ÁÙÊ±ÎÄ¼ş
+exit=0
