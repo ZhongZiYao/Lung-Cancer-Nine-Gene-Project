@@ -174,3 +174,23 @@ pipeline/week_1_baseline/outputs/bags_v3/
 
 # ÁÙÊ±ÎÄ¼ş
 exit=0
+
+# ----- Week-1 v3 features/bags (å¤?npz,ä¸ä¼  git) -----
+pipeline/week_1_baseline/outputs/bags_v3/*.npz
+pipeline/week_1_baseline/outputs/features_v3/*.npz
+
+# ----- 8/7 æ¸…ç†: å¤§ä»“åº?ç‰¹å¾ä¸å…¥ä»?-----
+TRIDENT/
+deepgem_feat_v2/
+deepgem_feat_v3/
+deepgem_feat_v3_titan/
+feat_416/
+models/TITAN/
+deepgem_combined_feat/
+deepgem_combined_feat_per_slice/
+deepgem_combined_feat_v3_case/
+egfr_pred*.csv
+egfr_pred_16case.csv
+egfr_pred_per_slice.csv
+egfr_pred_v3_case.csv
+deepgem_internal_*.pickle
