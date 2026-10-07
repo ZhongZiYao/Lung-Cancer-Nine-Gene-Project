@@ -38,15 +38,27 @@ def args():
     ap.add_argument("--model", default=os.path.join(R, "models", "midnight"))
     ap.add_argument("--tag", default="alchem")
     ap.add_argument("--skip-existing", type=int, default=0)
+    ap.add_argument("--mpp", type=float, default=0.5,
+                    help="target microns-per-pixel; 0.5 = 20x, matching the rest of this project")
     return ap.parse_args()
 
 
 def fetch(file_id, size, dst, retries=8):
     """Download one GDC file as NPAR resumable parallel byte ranges.
 
-    The first dry-run lost 5/20 slides to requests IncompleteRead: GDC drops
-    long-lived connections mid-stream. Each range therefore keeps its own cursor
-    and resumes with a fresh Range header until complete or out of retries.
+    Two bugs had to be fixed to make this reliable on GDC, both found the hard way:
+
+    1. GDC drops long-lived connections mid-transfer (requests IncompleteRead), so
+       each range keeps its own cursor and resumes with a fresh Range header.
+
+    2. Python file objects are NOT thread-safe for interleaved seek()+write(). All
+       12 threads sharing one handle corrupted each other's offsets, inflating a
+       1.63 GB file to 2.31 GB while the naive "bytes received" check still passed.
+       Fix: one independent file handle per thread, so each has its own position.
+
+    A ranged request must come back 206. If GDC answers 200 it is sending the whole
+    file regardless of the Range header; writing that would overrun the range, so
+    200 is rejected and retried.
     """
     span = max(1, size // NPAR)
     done = [0] * NPAR
@@ -57,52 +69,95 @@ def fetch(file_id, size, dst, retries=8):
         ends.append((s0, e0) if e0 >= s0 else (s0, s0 - 1))
     with open(dst, "wb") as f:
         f.truncate(size)
-    fh = open(dst, "r+b")
     errs = []
 
     def w(i):
         s0, e0 = ends[i]
         cur = s0
-        for a in range(retries):
-            if cur > e0:
-                break
-            try:
-                r = requests.get(GDC + file_id,
-                                 headers={"Range": "bytes=%d-%d" % (cur, e0)},
-                                 stream=True, timeout=(30, 180))
-                if r.status_code not in (200, 206):
-                    errs.append("r%d HTTP %d" % (i, r.status_code)); r.close()
-                    time.sleep(min(2 * (a + 1), 12)); continue
-                fh.seek(cur)
-                for ch in r.iter_content(1 << 20):
-                    if ch:
-                        fh.write(ch); cur += len(ch)
-                r.close()
-            except Exception as e:
-                errs.append("r%d@%.0fMB %s" % (i, (cur - s0) / 1e6, str(e)[:36]))
-                time.sleep(min(2 * (a + 1), 12))
-        done[i] = cur - s0
+        fh = None
+        try:
+            fh = open(dst, "r+b")          # per-thread handle -> independent position
+            for a in range(retries):
+                if cur > e0:
+                    break
+                try:
+                    r = requests.get(GDC + file_id,
+                                     headers={"Range": "bytes=%d-%d" % (cur, e0)},
+                                     stream=True, timeout=(30, 180))
+                    if r.status_code != 206:
+                        errs.append("r%d HTTP %d wanted 206" % (i, r.status_code))
+                        r.close()
+                        time.sleep(min(2 * (a + 1), 12))
+                        continue
+                    fh.seek(cur)
+                    for ch in r.iter_content(1 << 20):
+                        if not ch:
+                            continue
+                        room = e0 - cur + 1
+                        if room <= 0:
+                            break
+                        if len(ch) > room:
+                            ch = ch[:room]
+                        fh.write(ch)
+                        cur += len(ch)
+                    r.close()
+                except Exception as e:
+                    errs.append("r%d@%.0fMB %s" % (i, (cur - s0) / 1e6, str(e)[:36]))
+                    try:
+                        fh.flush()
+                    except Exception:
+                        pass
+                    time.sleep(min(2 * (a + 1), 12))
+        finally:
+            if fh is not None:
+                try:
+                    fh.flush(); fh.close()
+                except Exception:
+                    pass
+            done[i] = cur - s0
 
     ths = [threading.Thread(target=w, args=(i,)) for i in range(NPAR)]
     for t in ths: t.start()
     for t in ths: t.join()
-    fh.close()
     got = sum(done)
     if got != size:
         raise RuntimeError("incomplete %d/%d bytes ; %s" % (got, size, errs[:3]))
     if os.path.getsize(dst) != size:
-        raise RuntimeError("size mismatch %d != %d" % (os.path.getsize(dst), size))
+        raise RuntimeError("size mismatch %d != %d ; %s" % (os.path.getsize(dst), size, errs[:3]))
+
+
+def slide_mpp(osr):
+    """Objective magnification in um/px at level 0, read from the slide header."""
+    for k in ("openslide.mpp-x", "openslide.mpp-y", "aperio.MPP"):
+        v = osr.properties.get(k)
+        if v:
+            try:
+                m = float(v)
+                if 0.05 < m < 2.0:
+                    return m
+            except Exception:
+                pass
+    return float("nan")
 
 
 def tiles(path, rng):
     """Cut N_INST 224px tiles from a handful of contiguous blocks."""
     osr = openslide.OpenSlide(path)
     w, h = osr.dimensions
-    try:
-        mpp = float(osr.properties.get(openslide.PROPERTY_NAME_MPP, "nan"))
-    except Exception:
-        mpp = float("nan")
-    ds = 1.0 if not (mpp == mpp and mpp > 0) else max(1.0, mpp / TARGET_MPP)
+    mpp = slide_mpp(osr)
+    if not (mpp == mpp and mpp > 0):
+        # Previously this silently degraded to ds=1.0, which tiles at level 0
+        # native resolution. ALCHEMIST slides are 40x (mpp 0.2476), so that
+        # produced tiles 2x finer than intended and silently mismatched the
+        # 0.5 mpp used everywhere else in this project. Fail loud instead.
+        raise RuntimeError("cannot determine mpp; keys=%s" % sorted(osr.properties)[:8])
+    # ds = how much we scale DOWN from level 0. If the target is COARSER than the
+    # native scan (ALCHEMIST is 40x = 0.25 um/px, our nominal target is 0.5), hitting
+    # it would mean upsampling and inventing no new information, so we keep native
+    # resolution: 224 px at 0.25 um/px = 55 um field of view. Record the effective
+    # mpp so nobody mistakes this for 20x.
+    ds = max(1.0, mpp / TARGET_MPP)
+    eff_mpp = mpp * ds
     px = int(TILE * ds)
     bx = min(int(BLOCK * ds), int((w - px) // 1) if w > px else px)
     by = min(int(BLOCK * ds), int((h - px) // 1) if h > px else px)
@@ -138,7 +193,7 @@ def tiles(path, rng):
         out = out[rng.choice(len(out), N_INST, replace=False)]
     elif len(out) < N_INST:
         out = np.concatenate([out, out[rng.randint(0, len(out), N_INST - len(out))]])
-    return out, dict(mpp=mpp, ds=ds, level0_w=w, level0_h=h, n_available=len(out))
+    return out, dict(mpp=mpp, ds=ds, eff_mpp=eff_mpp, level0_w=w, level0_h=h, n_available=len(out))
 
 
 @torch.no_grad()
@@ -162,6 +217,8 @@ def embed(model, arr):
 
 def main():
     a = args()
+    global TARGET_MPP
+    TARGET_MPP = a.mpp
     os.makedirs(TMP, exist_ok=True)
     outdir = os.path.join(AL, "features_%s" % a.tag)
     os.makedirs(outdir, exist_ok=True)
@@ -185,7 +242,7 @@ def main():
                   % (len(have), n0 - len(m), len(m)), flush=True)
     todo = m.iloc[a.start:a.start + a.n]
     print("[job] %d slides (start=%d, only_luad=%d)" % (len(todo), a.start, a.only_luad), flush=True)
-    print("[job] out = %s" % outdir, flush=True)
+    print("[job] out = %s ; requested mpp=%.3f (ALCHEMIST is scanned at 40x=0.25, so effective will be 0.25 = 55um FOV)" % (outdir, TARGET_MPP), flush=True)
 
     from transformers import AutoModel
     t0 = time.time()
@@ -195,6 +252,15 @@ def main():
              torch.cuda.memory_allocated() / 1e9), flush=True)
 
     feats, index = [], []
+    if a.skip_existing:
+        fprev = os.path.join(outdir, "features.npy")
+        iprev = os.path.join(outdir, "index.csv")
+        if os.path.exists(fprev) and os.path.exists(iprev):
+            # Must APPEND to the previous run, not overwrite it: feats starts empty
+            # otherwise and the first np.save silently destroys all prior slides.
+            feats = list(np.load(fprev))
+            index = pd.read_csv(iprev).to_dict("records")
+            print("[resume] 载入已有特征 %d 例, 将在其后追加" % len(feats), flush=True)
     T0 = time.time()
     for k, row in enumerate(todo.itertuples()):
         dst = os.path.join(TMP, "%s.svs" % row.file_id)
