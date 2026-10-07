@@ -37,44 +37,59 @@ def args():
     ap.add_argument("--only-luad", type=int, default=0)
     ap.add_argument("--model", default=os.path.join(R, "models", "midnight"))
     ap.add_argument("--tag", default="alchem")
+    ap.add_argument("--skip-existing", type=int, default=0)
     return ap.parse_args()
 
 
-def fetch(file_id, size, dst):
-    """Download one GDC file as NPAR parallel byte ranges into a pre-sized file."""
+def fetch(file_id, size, dst, retries=8):
+    """Download one GDC file as NPAR resumable parallel byte ranges.
+
+    The first dry-run lost 5/20 slides to requests IncompleteRead: GDC drops
+    long-lived connections mid-stream. Each range therefore keeps its own cursor
+    and resumes with a fresh Range header until complete or out of retries.
+    """
     span = max(1, size // NPAR)
+    done = [0] * NPAR
+    ends = []
+    for i in range(NPAR):
+        s0 = i * span
+        e0 = size - 1 if i == NPAR - 1 else s0 + span - 1
+        ends.append((s0, e0) if e0 >= s0 else (s0, s0 - 1))
+    with open(dst, "wb") as f:
+        f.truncate(size)
+    fh = open(dst, "r+b")
     errs = []
 
     def w(i):
-        s0 = i * span
-        e0 = size - 1 if i == NPAR - 1 else s0 + span - 1
-        if e0 < s0:
-            return
-        try:
-            r = requests.get(GDC + file_id, headers={"Range": "bytes=%d-%d" % (s0, e0)},
-                             stream=True, timeout=(30, 180))
-            if r.status_code not in (200, 206):
-                errs.append("HTTP %d" % r.status_code)
-                r.close()
-                return
-            with open(dst, "r+b") as f:
-                f.seek(s0)
+        s0, e0 = ends[i]
+        cur = s0
+        for a in range(retries):
+            if cur > e0:
+                break
+            try:
+                r = requests.get(GDC + file_id,
+                                 headers={"Range": "bytes=%d-%d" % (cur, e0)},
+                                 stream=True, timeout=(30, 180))
+                if r.status_code not in (200, 206):
+                    errs.append("r%d HTTP %d" % (i, r.status_code)); r.close()
+                    time.sleep(min(2 * (a + 1), 12)); continue
+                fh.seek(cur)
                 for ch in r.iter_content(1 << 20):
                     if ch:
-                        f.write(ch)
-            r.close()
-        except Exception as e:
-            errs.append(str(e)[:80])
+                        fh.write(ch); cur += len(ch)
+                r.close()
+            except Exception as e:
+                errs.append("r%d@%.0fMB %s" % (i, (cur - s0) / 1e6, str(e)[:36]))
+                time.sleep(min(2 * (a + 1), 12))
+        done[i] = cur - s0
 
-    with open(dst, "wb") as f:
-        f.truncate(size)
     ths = [threading.Thread(target=w, args=(i,)) for i in range(NPAR)]
-    for t in ths:
-        t.start()
-    for t in ths:
-        t.join()
-    if errs:
-        raise RuntimeError("download errors: %s" % errs[:3])
+    for t in ths: t.start()
+    for t in ths: t.join()
+    fh.close()
+    got = sum(done)
+    if got != size:
+        raise RuntimeError("incomplete %d/%d bytes ; %s" % (got, size, errs[:3]))
     if os.path.getsize(dst) != size:
         raise RuntimeError("size mismatch %d != %d" % (os.path.getsize(dst), size))
 
@@ -160,6 +175,14 @@ def main():
     if a.only_luad:
         m = m[m.diagnosis.str.contains("Adenocarcinoma|Adenosquamous", na=False)]
         m = m.sort_values("case_id").reset_index(drop=True)
+    if a.skip_existing:
+        idxf = os.path.join(outdir, "index.csv")
+        if os.path.exists(idxf):
+            have = set(pd.read_csv(idxf).case_id)
+            n0 = len(m)
+            m = m[~m.case_id.isin(have)]
+            print("[resume] index.csv 已有 %d 例, 本次跳过 %d, 待跑 %d"
+                  % (len(have), n0 - len(m), len(m)), flush=True)
     todo = m.iloc[a.start:a.start + a.n]
     print("[job] %d slides (start=%d, only_luad=%d)" % (len(todo), a.start, a.only_luad), flush=True)
     print("[job] out = %s" % outdir, flush=True)
