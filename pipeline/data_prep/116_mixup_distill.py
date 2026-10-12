@@ -34,7 +34,7 @@ LR_, WD = 3e-4, 1e-3
 EPOCH = 25
 BATCH = 32
 T = 2.0
-LAMBDA_KD = 0.5
+LAMBDA_KD = 1.0  # alpha=1.0 = pure dark knowledge (best from §114b ablation)
 MIXUP_ALPHA = 0.4   # Beta(0.4, 0.4) -> mixup lambda distribution
 dev = "cuda" if torch.cuda.is_available() else "cpu"
 
