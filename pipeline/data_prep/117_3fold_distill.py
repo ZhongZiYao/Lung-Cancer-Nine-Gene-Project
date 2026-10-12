@@ -144,7 +144,7 @@ for fs_idx, fs in enumerate(FOLD_SEEDS):
 # Aggregate
 oof_avg = np.mean([oof_per_fs[f] for f in FOLD_SEEDS], axis=0)
 auc_avg = mean_auc(Y, oof_avg)
-mean_auc_fs = mean(results_per_fs.values())
+mean_auc_fs = float(np.mean(list(results_per_fs.values())))
 std_auc_fs = float(np.std(list(results_per_fs.values())))
 
 print(f"\n=== §47 FULL PROTOCOL RESULT ===", flush=True)
